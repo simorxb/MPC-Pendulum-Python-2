@@ -74,7 +74,7 @@ def solve_mpc(theta_ref, theta, dtheta, tau_ini, l, k, m, g, dt, Q11, Q22, R, N,
 # Plant parameters
 l = 1  # length of the pendulum
 k = 0.5  # coefficient of friction
-m = 0.5  # mass of the pendulum
+m_V = [0.3, 0.5, 0.7]  # mass of the pendulum
 g = 9.81  # acceleration due to gravity
 
 # Time step
@@ -109,12 +109,12 @@ dtheta[0] = dtheta0
 N = 20
 
 # Cost weights
-Q11 = 0.1 # angulare speed ignored
-Q22 = 1
-R = 0.1 # control input ignored - constraints are in place
+Q11 = 0.1 # angular speed weight
+Q22 = 1 # angular position weight
+R = 0.1 # control input weight
 
 # Max torque allowed
-tau_max = 10
+tau_max = 7
 
 # Max delta torque between two steps
 delta_tau_max = 1
@@ -128,49 +128,77 @@ g_est = 9.81  # acceleration due to gravity
 # Array for initial solution for MPC
 tau_ini = np.zeros(N)
 
+# Array for values of theta and tau for each simulation
+theta_V = []
+tau_V = []
+
 # ---------- SIMULATION ----------
 
-for idx in range(L):
+for idx_m in range(len(m_V)):
 
-    # ---------- SIMULATE USER INPUT ----------
+    # Init time
+    time = 0
 
-    # Generate reference setpoint
-    if time < 5:
-        theta_ref[idx] = math.pi # 180 deg
-    else:
-        theta_ref[idx] = math.pi*0.5 # 90 deg
-    
-    # Increment time
-    time += dt
+    # Arrays for logging
+    theta = np.zeros(L + 1)
+    dtheta = np.zeros(L + 1)
+    tau = np.zeros(L)
+    theta_ref = np.zeros(L)
 
-    # ---------- CONTROL SYSTEM LOOP ----------
-    
-    # Find optimal sequence for the next N steps
-    tau_mpc = solve_mpc(theta_ref[idx], theta[idx], dtheta[idx], tau_ini, l_est, k_est, m_est, g_est, dt, Q11, Q22, R, N, tau_max, delta_tau_max)
-    
-    # Use first element of control input optimal solution
-    tau[idx] = tau_mpc[0]
+    # Init arrays to initial state
+    theta[0] = theta0
+    dtheta[0] = dtheta0
 
-    # Initial solution for next step = current solution
-    tau_ini = tau_mpc
+    for idx in range(L):
 
-    # ---------- SIMULATION LOOP  ----------
+        # ---------- SIMULATE USER INPUT ----------
 
-    # Run dynamic system - pendulum
-    (theta[idx+1], dtheta[idx+1]) = pendulum_step(theta[idx], dtheta[idx], tau[idx], l, k, m, g, dt)
+        # Generate reference setpoint
+        if time < 5:
+            theta_ref[idx] = math.pi # 180 deg
+        else:
+            theta_ref[idx] = math.pi*0.5 # 90 deg
+        
+        # Increment time
+        time += dt
+
+        # ---------- CONTROL SYSTEM LOOP ----------
+        
+        # Find optimal sequence for the next N steps
+        tau_mpc = solve_mpc(theta_ref[idx], theta[idx], dtheta[idx], tau_ini, l_est, k_est, m_est, g_est, dt, Q11, Q22, R, N, tau_max, delta_tau_max)
+        
+        # Use first element of control input optimal solution
+        tau[idx] = tau_mpc[0]
+
+        # Initial solution for next step = current solution
+        tau_ini = tau_mpc
+
+        # ---------- SIMULATION LOOP  ----------
+
+        # Run dynamic system - pendulum
+        (theta[idx+1], dtheta[idx+1]) = pendulum_step(theta[idx], dtheta[idx], tau[idx], l, k, m_V[idx_m], g, dt)
+
+    # Append result for this simulation
+    theta_V.append(theta)
+    tau_V.append(tau)
 
 # Plot results
 
 plt.subplot(2, 1, 1)
-plt.plot(np.arange(L+1)*dt, theta[:]*180/math.pi, label="Theta [deg]")
-plt.plot(np.arange(L+1)*dt, dtheta[:]*180/math.pi, label="Angular speed [deg/s]")
-plt.plot(np.arange(L)*dt, theta_ref*180/math.pi, '--', label="Setpoint [deg]")
-plt.xlabel("Time")
+
+for idx_m in range(len(m_V)):
+    plt.plot(np.arange(L+1)*dt, theta_V[idx_m][:]*180/math.pi, label=f"Response - Mass = {m_V[idx_m]} kg")
+#plt.plot(np.arange(L+1)*dt, dtheta[:]*180/math.pi, label="Angular speed [deg/s]")
+plt.plot(np.arange(L)*dt, theta_ref*180/math.pi, '--', label="Setpoint")
+plt.ylabel(r"$\theta$ [deg]")
 plt.legend()
 plt.grid()
 
 plt.subplot(2, 1, 2)
-plt.plot(np.arange(L)*dt, tau, label="Tau [Nm]")
+
+for idx_m in range(len(m_V)):
+    plt.plot(np.arange(L)*dt, tau_V[idx_m], label=f"Control command - Mass = {m_V[idx_m]} kg")
+plt.ylabel(r"$\tau$ [Nm]")
 plt.xlabel("Time")
 plt.legend()
 plt.grid()
