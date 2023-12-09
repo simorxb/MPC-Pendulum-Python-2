@@ -185,7 +185,6 @@ for idx_m in range(len(m_V)):
 # Plot results
 
 plt.subplot(2, 1, 1)
-
 for idx_m in range(len(m_V)):
     plt.plot(np.arange(L+1)*dt, theta_V[idx_m][:]*180/math.pi, label=f"Response - Mass = {m_V[idx_m]} kg")
 #plt.plot(np.arange(L+1)*dt, dtheta[:]*180/math.pi, label="Angular speed [deg/s]")
@@ -195,7 +194,6 @@ plt.legend()
 plt.grid()
 
 plt.subplot(2, 1, 2)
-
 for idx_m in range(len(m_V)):
     plt.plot(np.arange(L)*dt, tau_V[idx_m], label=f"Control command - Mass = {m_V[idx_m]} kg")
 plt.ylabel(r"$\tau$ [Nm]")
